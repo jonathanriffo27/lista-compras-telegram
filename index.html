@@ -81,8 +81,15 @@
     tg.ready();
     tg.expand();
 
-    // Estado
-    let items = JSON.parse(localStorage.getItem('shoppingList')) || [];
+    // Estado - cargar desde localStorage o usar lista inicial de Google Keep
+    const defaultItems = [
+      { text: 'Poleras blancas', checked: false },
+      { text: 'Calcetines', checked: false },
+      { text: 'Boxers', checked: false },
+      { text: 'Licuadora para hacer batidos', checked: false },
+      { text: 'Casco de bicicleta', checked: false }
+    ];
+    let items = JSON.parse(localStorage.getItem('shoppingList')) || defaultItems;
 
     // Guardar en localStorage
     function save() {
