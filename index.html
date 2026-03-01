@@ -44,10 +44,14 @@
     .drag-handle {
       user-select: none;
       -webkit-user-select: none;
+      touch-action: none;
     }
     .draggable-item.dragging {
       opacity: 0.5;
       background: var(--border-color);
+    }
+    .draggable-item button {
+      touch-action: manipulation;
     }
     .main-button {
       background: var(--tg-theme-button-color, #3390ec);
@@ -205,23 +209,23 @@
           >
             <span class="drag-handle text-lg cursor-grab active:cursor-grabbing select-none" style="color: var(--text-secondary);">⋮⋮</span>
             <button 
-              onclick="togglePriority(${realIndex})"
-              class="w-6 h-6 rounded flex items-center justify-center flex-shrink-0 transition-colors text-base"
+              onclick="event.stopPropagation(); togglePriority(${realIndex})"
+              class="w-6 h-6 rounded flex items-center justify-center flex-shrink-0 transition-colors text-base z-10"
               style="background: transparent;"
             >
               ${item.priority ? '⭐' : '☆'}
             </button>
             <button 
-              onclick="toggleItem(${realIndex})"
-              class="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors text-sm"
+              onclick="event.stopPropagation(); toggleItem(${realIndex})"
+              class="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors text-sm z-10"
               style="border-color: var(--tg-theme-button-color, #3390ec); color: var(--item-text);"
             >
               ${item.checked ? '✓' : ''}
             </button>
-            <span class="flex-1 text-sm font-medium truncate">${escapeHtml(item.text)}</span>
+            <span class="flex-1 text-sm font-medium truncate select-none" onclick="event.stopPropagation(); toggleItem(${realIndex})">${escapeHtml(item.text)}</span>
             <button 
-              onclick="deleteItem(${realIndex})"
-              class="delete-btn text-white w-6 h-6 rounded flex items-center justify-center flex-shrink-0 text-xs"
+              onclick="event.stopPropagation(); deleteItem(${realIndex})"
+              class="delete-btn text-white w-6 h-6 rounded flex items-center justify-center flex-shrink-0 text-xs z-10"
             >
               ✕
             </button>
@@ -300,6 +304,7 @@
       const handle = e.target.closest('.drag-handle');
       if (!handle) return;
       
+      e.stopPropagation();
       touchDragIndex = parseInt(e.currentTarget.dataset.index);
       touchStartY = e.touches[0].clientY;
       e.currentTarget.style.opacity = '0.5';
@@ -308,11 +313,13 @@
 
     function handleTouchMove(e) {
       if (touchDragIndex === null) return;
+      e.stopPropagation();
       e.preventDefault();
     }
 
     function handleTouchEnd(e) {
       if (touchDragIndex === null) return;
+      e.stopPropagation();
       
       const touchEndY = e.changedTouches[0].clientY;
       const diff = touchEndY - touchStartY;
@@ -332,8 +339,8 @@
       }
       
       // Reset styles
-      const items = document.querySelectorAll('.draggable-item');
-      items.forEach(item => {
+      const dragItems = document.querySelectorAll('.draggable-item');
+      dragItems.forEach(item => {
         item.style.opacity = '1';
         item.style.transform = '';
       });
