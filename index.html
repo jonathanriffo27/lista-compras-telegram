@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>🛒 Lista de Compras</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: var(--tg-theme-bg-color, #ffffff);
+      color: var(--tg-theme-text-color, #000000);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .item-checked {
+      opacity: 0.5;
+      text-decoration: line-through;
+    }
+    .item-row {
+      transition: all 0.2s ease;
+    }
+    .item-row:active {
+      transform: scale(0.98);
+    }
+    .main-button {
+      background: var(--tg-theme-button-color, #3390ec);
+      color: var(--tg-theme-button-text-color, #ffffff);
+    }
+    .delete-btn {
+      background: var(--tg-theme-hint-color, #999999);
+    }
+  </style>
+</head>
+<body class="min-h-screen p-4 pb-20">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold">🛒 Lista de Compras</h1>
+    <button onclick="clearAll()" class="delete-btn text-white px-4 py-2 rounded-lg text-sm font-medium">
+      Limpiar Todo
+    </button>
+  </div>
+
+  <!-- Input -->
+  <div class="flex gap-2 mb-6">
+    <input 
+      type="text" 
+      id="itemInput" 
+      placeholder="Agregar item (ej: leche, pan...)"
+      class="flex-1 px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none text-base"
+      onkeypress="handleKeyPress(event)"
+    />
+    <button 
+      onclick="addItem()" 
+      class="main-button px-6 py-3 rounded-xl font-bold text-lg"
+    >
+      +
+    </button>
+  </div>
+
+  <!-- Stats -->
+  <div class="flex gap-4 mb-4 text-sm text-gray-500">
+    <span id="totalCount">0 items</span>
+    <span id="checkedCount">0 comprados</span>
+  </div>
+
+  <!-- List -->
+  <div id="shoppingList" class="space-y-2">
+    <!-- Items se agregan aquí -->
+  </div>
+
+  <!-- Empty State -->
+  <div id="emptyState" class="text-center py-12 text-gray-400">
+    <div class="text-6xl mb-4">🛒</div>
+    <p>Tu lista está vacía</p>
+    <p class="text-sm mt-2">Agrega items para comenzar</p>
+  </div>
+
+  <script>
+    // Inicializar Telegram Web App
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+
+    // Estado
+    let items = JSON.parse(localStorage.getItem('shoppingList')) || [];
+
+    // Guardar en localStorage
+    function save() {
+      localStorage.setItem('shoppingList', JSON.stringify(items));
+      render();
+    }
+
+    // Renderizar lista
+    function render() {
+      const list = document.getElementById('shoppingList');
+      const empty = document.getElementById('emptyState');
+      const total = document.getElementById('totalCount');
+      const checked = document.getElementById('checkedCount');
+
+      if (items.length === 0) {
+        list.innerHTML = '';
+        empty.style.display = 'block';
+        total.textContent = '0 items';
+        checked.textContent = '0 comprados';
+        return;
+      }
+
+      empty.style.display = 'none';
+      
+      const checkedCount = items.filter(i => i.checked).length;
+      total.textContent = `${items.length} item${items.length !== 1 ? 's' : ''}`;
+      checked.textContent = `${checkedCount} comprad${checkedCount !== 1 ? 'os' : 'o'}`;
+
+      list.innerHTML = items.map((item, index) => `
+        <div class="item-row flex items-center gap-3 p-4 bg-gray-50 rounded-xl ${item.checked ? 'item-checked' : ''}">
+          <button 
+            onclick="toggleItem(${index})"
+            class="w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors"
+            style="border-color: var(--tg-theme-button-color, #3390ec)"
+          >
+            ${item.checked ? '✓' : ''}
+          </button>
+          <span class="flex-1 text-base font-medium truncate">${escapeHtml(item.text)}</span>
+          <button 
+            onclick="deleteItem(${index})"
+            class="delete-btn text-white w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+          >
+            ✕
+          </button>
+        </div>
+      `).join('');
+    }
+
+    // Agregar item
+    function addItem() {
+      const input = document.getElementById('itemInput');
+      const text = input.value.trim();
+      
+      if (!text) return;
+
+      items.unshift({ text, checked: false });
+      input.value = '';
+      save();
+      
+      // Haptic feedback
+      tg.HapticFeedback.impactOccurred('light');
+    }
+
+    // Toggle item
+    function toggleItem(index) {
+      items[index].checked = !items[index].checked;
+      
+      // Mover items comprados al final
+      const item = items.splice(index, 1)[0];
+      items.push(item);
+      
+      save();
+      tg.HapticFeedback.impactOccurred('light');
+    }
+
+    // Delete item
+    function deleteItem(index) {
+      items.splice(index, 1);
+      save();
+      tg.HapticFeedback.impactOccurred('medium');
+    }
+
+    // Clear all
+    function clearAll() {
+      if (items.length === 0) return;
+      
+      tg.showConfirm('¿Borrar toda la lista?', (confirmed) => {
+        if (confirmed) {
+          items = [];
+          save();
+          tg.HapticFeedback.notificationOccurred('success');
+        }
+      });
+    }
+
+    // Handle Enter key
+    function handleKeyPress(event) {
+      if (event.key === 'Enter') {
+        addItem();
+      }
+    }
+
+    // Escape HTML
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Configurar Main Button de Telegram
+    tg.MainButton.setText('COMPARTIR LISTA');
+    tg.MainButton.onClick(() => {
+      const unchecked = items.filter(i => !i.checked).map(i => `• ${i.text}`).join('\n');
+      if (unchecked) {
+        tg.sendData(`🛒 Mi lista de compras:\n\n${unchecked}`);
+      } else {
+        tg.showAlert('¡Lista completa! Todos los items están comprados.');
+      }
+    });
+
+    // Mostrar Main Button solo si hay items
+    function updateMainButton() {
+      const unchecked = items.filter(i => !i.checked).length;
+      if (unchecked > 0) {
+        tg.MainButton.show();
+        tg.MainButton.setText(`COMPARTIR LISTA (${unchecked})`);
+      } else {
+        tg.MainButton.hide();
+      }
+    }
+
+    // Override save para actualizar Main Button
+    const originalSave = save;
+    save = function() {
+      originalSave();
+      updateMainButton();
+    };
+
+    // Render inicial
+    render();
+    updateMainButton();
+  </script>
+</body>
+</html>
