@@ -41,6 +41,14 @@
     .item-row:active {
       transform: scale(0.98);
     }
+    .drag-handle {
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .draggable-item.dragging {
+      opacity: 0.5;
+      background: var(--border-color);
+    }
     .main-button {
       background: var(--tg-theme-button-color, #3390ec);
       color: var(--tg-theme-button-text-color, #ffffff);
@@ -176,25 +184,13 @@
       checked.textContent = `${checkedCount} comprad${checkedCount !== 1 ? 'os' : 'o'}`;
 
       list.innerHTML = items.map((item, index) => `
-        <div class="item-row flex items-center gap-1 p-2 rounded-lg ${item.checked ? 'item-checked' : ''}" style="background: var(--item-bg); color: var(--item-text);">
-          <div class="flex flex-col gap-0.5">
-            <button 
-              onclick="moveItem(${index}, -1)"
-              class="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 text-xs"
-              style="background: var(--border-color); color: var(--text-primary);"
-              ${index === 0 ? 'disabled style="opacity:0.3"' : ''}
-            >
-              ↑
-            </button>
-            <button 
-              onclick="moveItem(${index}, 1)"
-              class="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 text-xs"
-              style="background: var(--border-color); color: var(--text-primary);"
-              ${index === items.length - 1 ? 'disabled style="opacity:0.3"' : ''}
-            >
-              ↓
-            </button>
-          </div>
+        <div 
+          class="item-row flex items-center gap-2 p-2 rounded-lg ${item.checked ? 'item-checked' : ''} draggable-item"
+          style="background: var(--item-bg); color: var(--item-text);"
+          draggable="true"
+          data-index="${index}"
+        >
+          <span class="drag-handle text-lg cursor-grab active:cursor-grabbing select-none" style="color: var(--text-secondary);">⋮⋮</span>
           <button 
             onclick="toggleItem(${index})"
             class="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors text-sm"
@@ -211,6 +207,9 @@
           </button>
         </div>
       `).join('');
+
+      // Setup drag and drop after render
+      setupDragAndDrop();
     }
 
     // Agregar item
@@ -228,18 +227,97 @@
       tg.HapticFeedback.impactOccurred('light');
     }
 
-    // Mover item (arriba/abajo)
-    function moveItem(index, direction) {
-      const newIndex = index + direction;
+    // Setup drag and drop
+    let draggedIndex = null;
+
+    function setupDragAndDrop() {
+      const dragItems = document.querySelectorAll('.draggable-item');
       
-      // Validar límites
-      if (newIndex < 0 || newIndex >= items.length) return;
+      dragItems.forEach((item, index) => {
+        item.addEventListener('dragstart', (e) => {
+          draggedIndex = index;
+          item.style.opacity = '0.5';
+          e.dataTransfer.effectAllowed = 'move';
+        });
+
+        item.addEventListener('dragend', () => {
+          item.style.opacity = '1';
+          draggedIndex = null;
+        });
+
+        item.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+        });
+
+        item.addEventListener('drop', (e) => {
+          e.preventDefault();
+          const droppedIndex = index;
+          
+          if (draggedIndex !== null && draggedIndex !== droppedIndex) {
+            // Mover item
+            const draggedItem = items[draggedIndex];
+            items.splice(draggedIndex, 1);
+            items.splice(droppedIndex, 0, draggedItem);
+            save();
+            tg.HapticFeedback.impactOccurred('light');
+          }
+        });
+
+        // Touch support para móvil
+        item.addEventListener('touchstart', handleTouchStart, { passive: false });
+        item.addEventListener('touchmove', handleTouchMove, { passive: false });
+        item.addEventListener('touchend', handleTouchEnd);
+      });
+    }
+
+    // Touch handlers para drag en móvil
+    let touchDragIndex = null;
+    let touchStartY = 0;
+
+    function handleTouchStart(e) {
+      const handle = e.target.closest('.drag-handle');
+      if (!handle) return;
       
-      // Intercambiar items
-      [items[index], items[newIndex]] = [items[newIndex], items[index]];
+      touchDragIndex = parseInt(e.currentTarget.dataset.index);
+      touchStartY = e.touches[0].clientY;
+      e.currentTarget.style.opacity = '0.5';
+      e.currentTarget.style.transform = 'scale(1.02)';
+    }
+
+    function handleTouchMove(e) {
+      if (touchDragIndex === null) return;
+      e.preventDefault();
+    }
+
+    function handleTouchEnd(e) {
+      if (touchDragIndex === null) return;
       
-      save();
-      tg.HapticFeedback.impactOccurred('light');
+      const touchEndY = e.changedTouches[0].clientY;
+      const diff = touchEndY - touchStartY;
+      const itemHeight = 50; // aproximado
+      
+      if (Math.abs(diff) > itemHeight / 2) {
+        const direction = diff > 0 ? 1 : -1;
+        const newIndex = touchDragIndex + direction;
+        
+        if (newIndex >= 0 && newIndex < items.length) {
+          const draggedItem = items[touchDragIndex];
+          items.splice(touchDragIndex, 1);
+          items.splice(newIndex, 0, draggedItem);
+          save();
+          tg.HapticFeedback.impactOccurred('light');
+        }
+      }
+      
+      // Reset styles
+      const items = document.querySelectorAll('.draggable-item');
+      items.forEach(item => {
+        item.style.opacity = '1';
+        item.style.transform = '';
+      });
+      
+      touchDragIndex = null;
     }
 
     // Toggle item
