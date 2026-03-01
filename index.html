@@ -148,11 +148,11 @@
 
     // Estado - cargar desde localStorage o usar lista inicial de Google Keep
     const defaultItems = [
-      { text: 'Poleras blancas', checked: false },
-      { text: 'Calcetines', checked: false },
-      { text: 'Boxers', checked: false },
-      { text: 'Licuadora para hacer batidos', checked: false },
-      { text: 'Casco de bicicleta', checked: false }
+      { text: 'Poleras blancas', checked: false, priority: false },
+      { text: 'Calcetines', checked: false, priority: false },
+      { text: 'Boxers', checked: false, priority: false },
+      { text: 'Licuadora para hacer batidos', checked: false, priority: false },
+      { text: 'Casco de bicicleta', checked: false, priority: false }
     ];
     let items = JSON.parse(localStorage.getItem('shoppingList')) || defaultItems;
 
@@ -183,30 +183,51 @@
       total.textContent = `${items.length} item${items.length !== 1 ? 's' : ''}`;
       checked.textContent = `${checkedCount} comprad${checkedCount !== 1 ? 'os' : 'o'}`;
 
-      list.innerHTML = items.map((item, index) => `
-        <div 
-          class="item-row flex items-center gap-2 p-2 rounded-lg ${item.checked ? 'item-checked' : ''} draggable-item"
-          style="background: var(--item-bg); color: var(--item-text);"
-          draggable="true"
-          data-index="${index}"
-        >
-          <span class="drag-handle text-lg cursor-grab active:cursor-grabbing select-none" style="color: var(--text-secondary);">⋮⋮</span>
-          <button 
-            onclick="toggleItem(${index})"
-            class="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors text-sm"
-            style="border-color: var(--tg-theme-button-color, #3390ec); color: var(--item-text);"
+      // Ordenar: prioritarios primero (solo visuales, array original se mantiene)
+      const sortedIndices = items.map((_, i) => i).sort((a, b) => {
+        // Items comprados siempre al final
+        if (items[a].checked && !items[b].checked) return 1;
+        if (!items[a].checked && items[b].checked) return -1;
+        // Prioritarios primero
+        if (items[a].priority && !items[b].priority) return -1;
+        if (!items[a].priority && items[b].priority) return 1;
+        return 0;
+      });
+
+      list.innerHTML = sortedIndices.map((realIndex) => {
+        const item = items[realIndex];
+        return `
+          <div 
+            class="item-row flex items-center gap-1 p-2 rounded-lg ${item.checked ? 'item-checked' : ''} ${item.priority ? 'priority-item' : ''} draggable-item"
+            style="background: var(--item-bg); color: var(--item-text); ${item.priority ? 'border: 2px solid #f59e0b' : ''}"
+            draggable="true"
+            data-index="${realIndex}"
           >
-            ${item.checked ? '✓' : ''}
-          </button>
-          <span class="flex-1 text-sm font-medium truncate">${escapeHtml(item.text)}</span>
-          <button 
-            onclick="deleteItem(${index})"
-            class="delete-btn text-white w-6 h-6 rounded flex items-center justify-center flex-shrink-0 text-xs"
-          >
-            ✕
-          </button>
-        </div>
-      `).join('');
+            <span class="drag-handle text-lg cursor-grab active:cursor-grabbing select-none" style="color: var(--text-secondary);">⋮⋮</span>
+            <button 
+              onclick="togglePriority(${realIndex})"
+              class="w-6 h-6 rounded flex items-center justify-center flex-shrink-0 transition-colors text-base"
+              style="background: transparent;"
+            >
+              ${item.priority ? '⭐' : '☆'}
+            </button>
+            <button 
+              onclick="toggleItem(${realIndex})"
+              class="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors text-sm"
+              style="border-color: var(--tg-theme-button-color, #3390ec); color: var(--item-text);"
+            >
+              ${item.checked ? '✓' : ''}
+            </button>
+            <span class="flex-1 text-sm font-medium truncate">${escapeHtml(item.text)}</span>
+            <button 
+              onclick="deleteItem(${realIndex})"
+              class="delete-btn text-white w-6 h-6 rounded flex items-center justify-center flex-shrink-0 text-xs"
+            >
+              ✕
+            </button>
+          </div>
+        `;
+      }).join('');
 
       // Setup drag and drop after render
       setupDragAndDrop();
@@ -318,6 +339,13 @@
       });
       
       touchDragIndex = null;
+    }
+
+    // Toggle prioridad
+    function togglePriority(index) {
+      items[index].priority = !items[index].priority;
+      save();
+      tg.HapticFeedback.impactOccurred('light');
     }
 
     // Toggle item
