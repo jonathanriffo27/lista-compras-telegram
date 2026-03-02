@@ -141,28 +141,14 @@
     const db = firebase.database();
     const itemsRef = db.ref('items');
 
-    // Estado inicial
-    const defaultItems = [
-      { text: 'Poleras blancas', checked: false, priority: false },
-      { text: 'Calcetines', checked: false, priority: false },
-      { text: 'Boxers', checked: false, priority: false },
-      { text: 'Licuadora para hacer batidos', checked: false, priority: false },
-      { text: 'Casco de bicicleta', checked: false, priority: false },
-      { text: 'Cloro', checked: false, priority: false }
-    ];
+    // Estado inicial - lista vacía
     let items = [];
     let isInitialized = false;
 
     // Cargar items desde Firebase
     itemsRef.once('value').then((snapshot) => {
       const data = snapshot.val();
-      if (data) {
-        items = Object.values(data);
-      } else {
-        // Primer uso: guardar items por defecto
-        items = defaultItems;
-        itemsRef.set(items);
-      }
+      items = data ? Object.values(data) : [];
       isInitialized = true;
       render();
     });
@@ -423,8 +409,9 @@
       
       tg.showConfirm('¿Borrar toda la lista?', (confirmed) => {
         if (confirmed) {
+          itemsRef.remove();
           items = [];
-          save();
+          render();
           tg.HapticFeedback.notificationOccurred('success');
         }
       });
